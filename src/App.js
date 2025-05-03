@@ -5,6 +5,7 @@ import './App.css';
 import LandingPage from './pages/LandingPage';
 import Home from './pages/Home';
 import HandleProtocol from './handle-protocol';
+import VitalPage from './pages/VitalPage';
 
 function App() {
   return (
@@ -15,6 +16,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/Home" element={<Home />} />
           <Route path="/handle-protocol" element={<HandleProtocol />} />
+          <Route path="/dashboard" element={<VitalPage />} /> {}
+
   
         </Routes>
       </div>

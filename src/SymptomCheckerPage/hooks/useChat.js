@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { fetchDiagnosis, fetchReport, fetchSpecialization as fetchSpec } from "../utils/api";
 
+////////
+
 export default function useChat(chatRef) {
   const [messages, setMessages] = useState([]);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
