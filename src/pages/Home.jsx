@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LiaMapSolid } from "react-icons/lia";
 import { GoHistory } from "react-icons/go";
 import { AiOutlineFundView, AiOutlineUser } from "react-icons/ai";
@@ -13,12 +13,47 @@ import { CgMenuLeft } from "react-icons/cg";
 
 
 const Home = () => {
-  const [isDisabled, setIsDisabled] = useState(false); // Example: Initially disabled
-  const [activePage, setActivePage] = useState('symptom'); // Track the current active page
-  const [isDropdownVisible, setIsDropdownVisible] = useState(false); // Track dropdown visibility
-  const currentDate = new Date().toLocaleDateString(); // Current date
+  const [isDisabled, setIsDisabled] = useState(false);
+  const [activePage, setActivePage] = useState('symptom');
+  const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const currentDate = new Date().toLocaleDateString();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  
+  // Add state for Fitbit token
+  const [fitbitToken, setFitbitToken] = useState('');
+  
+  // Check for token in URL when component mounts
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromURL = params.get('token');
+    const viewFromURL = params.get('view');
+    
+    // If token found, store it and clean up URL
+    if (tokenFromURL) {
+      setFitbitToken(`Bearer ${tokenFromURL}`);
+      
+      // Clean up URL by removing query parameters
+      window.history.replaceState({}, document.title, '/home');
+    }
+    
+    // If view parameter is present, set active page
+    if (viewFromURL === 'vital') {
+      setActivePage('vital');
+    }
+  }, []);
+  
+  // Handle switching to vital page
+  const handleVitalClick = () => {
+    if (isDisabled) return;
+    
+    // If we have a token, just switch pages
+    if (fitbitToken) {
+      setActivePage('vital');
+    } else {
+      // If no token, redirect to Fitbit auth
+      window.location.href = 'http://localhost:5000/authorize';
+    }
+  };
 
   return (
     <div className="h-screen bg-opacity-0 custom-scrollbar flex flex-col relative">
@@ -34,13 +69,11 @@ const Home = () => {
               sekmed*
             </h1>
           </div>
-       
         </div>
 
         {/* Icons for Page Switching */}
         <div className="flex ">
           <div className="flex items-start justify-start ring-1 ring-gray-200 rounded-full">
-            
             <PiBrainBold
               onClick={() => setActivePage('symptom')}
               className={`text-4xl m-1 ring-1 ring-gray-200 rounded-full p-2 cursor-pointer ${
@@ -48,9 +81,7 @@ const Home = () => {
               }`}
             />
             <TbActivityHeartbeat
-              onClick={() => {
-                if (!isDisabled) setActivePage('vital');
-              }}
+              onClick={handleVitalClick} 
               className={`text-4xl m-1 ring-1 ring-gray-200 rounded-full p-2 ${
                 activePage === 'vital' ? 'bg-red-200' : 'bg-white'
               } ${
@@ -59,19 +90,16 @@ const Home = () => {
                   : 'cursor-pointer hover:bg-gray-200'
               }`}
             />
-
           </div>
         </div>
       </div>
-      {/* Side Menu */}
-      
 
       {/* Main Content Area */}
-      <div className="flex items-start    ">
+      <div className="flex items-start">
         {/* Main Content */}
-        <div className=" w-full rounded-3xl ">
-          {activePage === 'vital' && <VitalPage/>}
-          {activePage === 'symptom' && <SymptomCheckerPage  />}
+        <div className="w-full rounded-3xl">
+          {activePage === 'vital' && <VitalPage externalToken={fitbitToken} />}
+          {activePage === 'symptom' && <SymptomCheckerPage />}
         </div>
       </div>
     </div>
