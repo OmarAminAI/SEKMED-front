@@ -5,6 +5,7 @@ import {
   Title, Tooltip, Legend, PointElement
 } from 'chart.js';
 import { FaHeartbeat, FaFire, FaWalking } from 'react-icons/fa';
+import { useVitals } from '../contexts/VitalsContext'; 
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, Title, Tooltip, Legend, PointElement);
 
@@ -13,31 +14,35 @@ const VitalPage = ({ externalToken }) => {
     heart_rate: [],
     step_count: [],
     calories: [],
+    distance: [],
   });
 
-  // Period selection for each chart type
   const [periods, setPeriods] = useState({
     heart_rate: '7d',
     steps: '7d',
     calories: '7d',
+    distance: '7d',
   });
 
-  // Loading states for each chart
   const [loading, setLoading] = useState({
     heart_rate: false,
     steps: false,
     calories: false,
+    distance: false,
   });
 
-  // Current metrics for summary display
   const [summaries, setSummaries] = useState({
     current_heart_rate: '--',
     current_steps: '--',
     current_calories: '--',
+    current_distance: '--',
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [accessToken, setAccessToken] = useState('');
+
+  // Context for sharing vitals with chat
+  const { setVitals } = useVitals();
 
   useEffect(() => {
     if (externalToken) {
@@ -50,7 +55,7 @@ const VitalPage = ({ externalToken }) => {
     if (tokenFromURL) {
       setAccessToken(`Bearer ${tokenFromURL}`);
       setIsLoggedIn(true);
-      window.history.replaceState({}, document.title, window.location.pathname);  
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else {
       setIsLoggedIn(false);
     }
@@ -68,6 +73,24 @@ const VitalPage = ({ externalToken }) => {
     });
   }, [periods, accessToken]);
 
+  // Share latest vitals with Context whenever data changes
+  useEffect(() => {
+    if (
+      fitData.heart_rate.length > 0 ||
+      fitData.step_count.length > 0 ||
+      fitData.calories.length > 0 ||
+      fitData.distance.length > 0
+    ) {
+      setVitals({
+        heart_rate: fitData.heart_rate,
+        step_count: fitData.step_count,
+        calories: fitData.calories,
+        distance: fitData.distance,
+        summaries
+      });
+    }
+  }, [fitData, summaries, setVitals]);
+
   const fetchAllData = () => {
     Object.entries(periods).forEach(([type, period]) => {
       fetchDataForType(type, period);
@@ -83,6 +106,7 @@ const VitalPage = ({ externalToken }) => {
         heart_rate: 'heart',
         steps: 'steps',
         calories: 'calories',
+        distance: 'distance',
       };
       const endpoint = endpointMap[type];
       const response = await fetch(`${baseUrl}/api/data/${endpoint}?period=${period}`, {
@@ -106,15 +130,32 @@ const VitalPage = ({ externalToken }) => {
           }
         }
       } else if (type === 'steps') {
-        setFitData(prev => ({ 
-          ...prev, 
-          step_count: data['activities-steps'] || [] 
+        setFitData(prev => ({
+          ...prev,
+          step_count: data['activities-steps'] || []
         }));
       } else if (type === 'calories') {
-        setFitData(prev => ({ 
-          ...prev, 
-          calories: data['activities-calories'] || [] 
+        setFitData(prev => ({
+          ...prev,
+          calories: data['activities-calories'] || []
         }));
+      } else if (type === 'distance') {
+        console.log('Raw distance data:', data); // Debug log
+        try {
+          const distanceData = data['activities-distance'] || [];
+          console.log('Parsed distance data:', distanceData); // Debug log
+          
+          setFitData(prev => ({
+            ...prev,
+            distance: distanceData.map(item => ({
+              dateTime: item.dateTime,
+              value: parseFloat(item.value) || 0  // Ensure numeric values
+            }))
+          }));
+        } catch (error) {
+          console.error('Error parsing distance data:', error);
+          setFitData(prev => ({ ...prev, distance: [] }));
+        }
       }
     } catch (error) {
       console.error(`Error fetching ${type} data:`, error);
@@ -123,7 +164,6 @@ const VitalPage = ({ externalToken }) => {
     }
   };
 
-  // Fetch activity summary for metrics
   const fetchActivitySummary = async () => {
     try {
       const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:5000";
@@ -136,6 +176,11 @@ const VitalPage = ({ externalToken }) => {
           ...prev,
           current_steps: formatNumber(data.summary.steps || 0),
           current_calories: formatNumber(data.summary.caloriesOut || 0),
+          current_distance: data.summary.distances ? 
+            (() => {
+              const totalDist = data.summary.distances.find(d => d.activity === 'total');
+              return totalDist ? Number(totalDist.distance).toFixed(2) : "--";
+            })() : '--',
         }));
       }
     } catch (error) {
@@ -160,18 +205,6 @@ const VitalPage = ({ externalToken }) => {
   };
 
   // Chart data configs
-  const stepsData = {
-    labels: extractLabels(fitData.step_count),
-    datasets: [{
-      label: 'Steps',
-      data: extractValues(fitData.step_count),
-      backgroundColor: 'rgba(54, 162, 235, 0.5)',
-      borderColor: 'rgba(54, 162, 235, 1)',
-      borderWidth: 2,
-      borderRadius: 50,
-    }],
-  };
-
   const heartRateData = {
     labels: extractLabels(fitData.heart_rate),
     datasets: [{
@@ -184,6 +217,18 @@ const VitalPage = ({ externalToken }) => {
     }],
   };
 
+  const stepsData = {
+    labels: extractLabels(fitData.step_count),
+    datasets: [{
+      label: 'Steps',
+      data: extractValues(fitData.step_count),
+      backgroundColor: 'rgba(54, 162, 235, 0.5)',
+      borderColor: 'rgba(54, 162, 235, 1)',
+      borderWidth: 2,
+      borderRadius: 50,
+    }],
+  };
+
   const caloriesData = {
     labels: extractLabels(fitData.calories),
     datasets: [{
@@ -193,6 +238,19 @@ const VitalPage = ({ externalToken }) => {
       borderColor: 'rgba(255, 206, 86, 1)',
       borderWidth: 2,
       borderRadius: 50,
+    }],
+  };
+
+  const distanceData = {
+    labels: extractLabels(fitData.distance),
+    datasets: [{
+      label: 'Distance (km)',
+      data: extractValues(fitData.distance),
+      backgroundColor: 'rgba(99, 255, 132, 0.5)',
+      borderColor: 'rgba(99, 255, 132, 1)',
+      borderWidth: 2,
+      tension: 0.4,
+      fill: true,
     }],
   };
 
@@ -220,7 +278,6 @@ const VitalPage = ({ externalToken }) => {
     }
   };
 
-  // Period buttons
   const renderPeriodButtons = (chartType) => {
     const periodOptions = [
       { value: '1d', label: 'Daily' },
@@ -246,7 +303,6 @@ const VitalPage = ({ externalToken }) => {
     );
   };
 
-  // Loader for chart
   const renderLoadingIndicator = (chartType) => {
     if (!loading[chartType]) return null;
     return (
@@ -256,18 +312,14 @@ const VitalPage = ({ externalToken }) => {
     );
   };
 
-  // No login screen stays the same as before! (omitted here for brevity—keep as in original)
-
   if (!isLoggedIn) {
     return (
-      // Reuse your previous welcome card!
       <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 py-16">
         {/* ... your welcome card ... */}
       </div>
     );
   }
 
-  // Main content: THREE vertical cards
   return (
     <div className="flex flex-col gap-8 px-4 py-4">
 
@@ -287,6 +339,63 @@ const VitalPage = ({ externalToken }) => {
             <div className="h-[280px] relative bg-slate-50 rounded-lg">
               <Line data={heartRateData} options={chartOptions} />
               {renderLoadingIndicator('heart_rate')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Distance Card */}
+      <div className="bg-white shadow rounded-2xl p-6 dashboard-card">
+        <h2 className="text-xl font-bold flex items-center mb-4 gap-2">
+          <span role="img" aria-label="distance" className="text-green-500">🦶</span> Distance Covered
+        </h2>
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="metric-card flex-1 flex flex-col justify-center items-center mb-4 md:mb-0">
+            <div className="text-gray-700 font-semibold">Today's Distance</div>
+            <div className="text-green-500 text-3xl font-bold">{summaries.current_distance} km</div>
+            <div className="text-xs text-gray-400">Total Distance Today</div>
+          </div>
+          <div className="flex-[3]">
+            {renderPeriodButtons('distance')}
+            <div className="h-[280px] relative bg-slate-50 rounded-lg">
+              {fitData.distance.length <= 1 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                  Not enough data points to display chart. Try a longer time period.
+                </div>
+              ) : (
+                <Line 
+                  data={{
+                    labels: fitData.distance.map(item => formatDate(item.dateTime || '')),
+                    datasets: [{
+                      label: 'Distance (km)',
+                      data: fitData.distance.map(item => parseFloat(item.value) || 0),
+                      backgroundColor: 'rgba(99, 255, 132, 0.5)',
+                      borderColor: 'rgba(99, 255, 132, 1)',
+                      borderWidth: 2,
+                      tension: 0.4,
+                      fill: true,
+                      pointRadius: 4,
+                      pointBackgroundColor: 'rgba(99, 255, 132, 1)'
+                    }]
+                  }} 
+                  options={{
+                    ...chartOptions,
+                    scales: {
+                      ...chartOptions.scales,
+                      y: {
+                        ...chartOptions.scales.y,
+                        title: {
+                          display: true,
+                          text: 'Distance (km)'
+                        },
+                        min: 0,
+                        suggestedMax: Math.max(...fitData.distance.map(item => parseFloat(item.value) || 0)) * 1.2 || 1,
+                      }
+                    }
+                  }} 
+                />
+              )}
+              {renderLoadingIndicator('distance')}
             </div>
           </div>
         </div>
