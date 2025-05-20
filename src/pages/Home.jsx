@@ -51,7 +51,7 @@ const Home = () => {
       setActivePage('vital');
     } else {
       // If no token, redirect to Fitbit auth
-      window.location.href = 'http://localhost:5000/authorize';
+      window.location.href = 'https://vitals-backend.vercel.app/authorize';
     }
   };
 
