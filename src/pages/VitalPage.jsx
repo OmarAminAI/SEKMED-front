@@ -101,7 +101,7 @@ const VitalPage = ({ externalToken }) => {
   const fetchDataForType = async (type, period) => {
     setLoading(prev => ({ ...prev, [type]: true }));
     try {
-      const baseUrl = process.env.REACT_APP_API_URL || "https://vitals-backend.vercel.app";
+      const baseUrl = process.env.REACT_APP_API_URL || "https://sekmed-fitbit2.vercel.app";
       const endpointMap = {
         heart_rate: 'heart',
         steps: 'steps',
@@ -166,7 +166,7 @@ const VitalPage = ({ externalToken }) => {
 
   const fetchActivitySummary = async () => {
     try {
-      const baseUrl = process.env.REACT_APP_API_URL || "https://vitals-backend.vercel.app";
+      const baseUrl = process.env.REACT_APP_API_URL || "https://sekmed-fitbit2.vercel.app";
       const response = await fetch(`${baseUrl}/api/data/activity_summary`, {
         headers: { Authorization: accessToken }
       });
